@@ -10,10 +10,19 @@
 #include "Perception/AISense_Damage.h"
 #include "StudentPerceptor.generated.h"
 
+class USurvBrain;
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class INDEHERBERGEFERENTZZOMBIERUNTIME_API UStudentPerceptor : public UActorComponent
 {
 	GENERATED_BODY()
+
+	AActor* parent;
+	USurvBrain* brain;
+	UAIPerceptionComponent* parentPerception;
+
+	FAISenseID sightId;
+	FAISenseID hurtId;
 
 public:
 	// Sets default values for this component's properties
