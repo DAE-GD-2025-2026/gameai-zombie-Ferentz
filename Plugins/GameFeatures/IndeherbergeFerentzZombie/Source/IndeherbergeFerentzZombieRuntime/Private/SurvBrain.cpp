@@ -10,24 +10,12 @@
 #include "Items/BaseItem.h"
 #include "Items/Weapon.h"
 #include "Village/House/House.h"
-#include <AIController.h>
 #include "Zombies/BaseZombie.h"
 #include <SurvivorSate.h>
 #include "Survivor/SurvivorPawn.h"
 
-void USurvBrain::PickupItem(ABaseItem* itme)
-{
-	GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
-		FString::Printf(TEXT("Can Enemy Shoot? %i"), maxInventory));
-	if (invenorySlot >= maxInventory)
-	{
-		GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
-			FString::Printf(TEXT("inventory full")));
-		return;
-	}
-	inventory->GrabItem(invenorySlot,itme);
-	invenorySlot++;
-}
+#include <AIController.h>
+
 
 // Sets default values for this component's properties
 USurvBrain::USurvBrain()
@@ -76,7 +64,7 @@ void USurvBrain::BeginPlay()
 		}
 	}
 	goal = EGoalType::Search;
-	executeState = true;
+	executeGoal = true;
 
 	blackboard->SetValueAsObject("brain", this);
 	
@@ -87,130 +75,132 @@ void USurvBrain::TickComponent(float DeltaTime, ELevelTick TickType, FActorCompo
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (executeState)
+	if (health->GetHealth() < health->GetMaxHealth() / 2)
 	{
-		ExecuteState();
+
+	}
+
+	houseTimer += DeltaTime;
+	if (houseTimer >= houseTurnover * (visitedHouses.Num() + 1))
+	{
+		ClearHouses();
+	}
+
+	//health->HealDamage(10);
+	if (executeGoal)
+	{
+		ExecuteGoal();
 	}
 	// ...
 }
 
-void USurvBrain::JobsDone(bool completedGoal)
-{
-	health->HealDamage(10);
-	CompleteGoal();
-	executeState = true;
-}
 
+#pragma region input
 void USurvBrain::GetHurt(AActor* Actor, FAIStimulus Stimulus)
 {
 
-	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green, 
-	FString::Printf(TEXT("Saw Something!")));
-	/*if (auto controller = Cast<AAIController>(parent->GetInstigatorController()))
-	{
-		if (auto blackboard = controller->GetBlackboardComponent())
-		{
-			blackboard->SetValueAsBool("hasSeenZom", true);
-			blackboard->SetValueAsObject("stimuli", Actor);
-		}
-	}*/
+	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
+		FString::Printf(TEXT("got hurt!")));
+
 	if (auto zombie = Cast<ABaseZombie>(Actor))
 	{
-		blackboard->SetValueAsBool("hasSeenZom", true);
-		blackboard->SetValueAsObject("zombie", Actor);
+		knownZombies.Add(zombie);
 	}
-	
 
+	EvaluateGoal();
 }
 
 void USurvBrain::SpotThing(AActor* Actor, FAIStimulus Stimulus)
 {
 	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
-	FString::Printf(TEXT("Saw Something!")));
+		FString::Printf(TEXT("Saw Something!")));
 	ABaseItem* item = Cast<ABaseItem>(Actor);
 	if (item != nullptr)
 	{
-		const TArray<ABaseItem*>& Items = inventory->GetInventory();
-		if (Items.Contains(item)) return;
-		GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
-			FString::Printf(TEXT("Saw item!")));
-
-		if (item->GetItemType() == EItemType::Garbage) return;
-		/*if (item->GetValue() == 0)
-		{
-			GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
-				FString::Printf(TEXT("empty item")));
-			return;
-		}*/
-
-		//blackboard->SetValueAsObject("item", item);
-
-		
-		PickupItem(item);
-		
-
-		for (ABaseItem* InvItem : Items)
-		{
-			if (IsValid(InvItem))
-			{
-				GEngine->AddOnScreenDebugMessage(
-					-1,
-					5.f,
-					FColor::Green,
-					FString::Printf(TEXT("Inventory item: %s"), *InvItem->GetName())
-				);
-			}
-		}
-		GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
-			FString::Printf(TEXT("end inventory")));
+		SpotItem(item);
+		return;
 	}
 	else if (auto house = Cast<AHouse>(Actor))
 	{
-		
-		if (toVisitHouses.Contains(house) || visitedHouses.Contains(house)) return;
 
-		toVisitHouses.Add(house);
-
-		GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
-			FString::Printf(TEXT("Saw house!")));
-
-		goal = EGoalType::Loot;
-		executeState = true;
+		SpotHouse(house);
 	}
 	else if (auto zombi = Cast<ABaseZombie>(Actor))
 	{
-		GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
-			FString::Printf(TEXT("Saw zombi!")));
-		knownZombies.Add(zombi);
-		goal = EGoalType::Hide;
-		executeState = true;
+		SpotZombie(zombi);
 	}
+
+	EvaluateGoal();
 }
 
-void USurvBrain::CompleteGoal()
+void USurvBrain::SpotItem(ABaseItem* item)
 {
-	switch (goal)
+	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
+		FString::Printf(TEXT("Saw item!")));
+
+	const TArray<ABaseItem*>& Items = inventory->GetInventory();
+	if (Items.Contains(item)) return;
+
+	if (item->GetItemType() == EItemType::Garbage) return;
+	if (item->GetValue() == 0) return;
+
+	PickupItem(item);
+}
+
+void USurvBrain::SpotHouse(AHouse* house)
+{
+	if (toVisitHouses.Contains(house) || visitedHouses.Contains(house)) return;
+
+	toVisitHouses.Add(house);
+
+	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
+		FString::Printf(TEXT("Saw house!")));
+
+}
+
+void USurvBrain::SpotZombie(ABaseZombie* zombie)
+{
+	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
+		FString::Printf(TEXT("Saw zombi!")));
+	knownZombies.Add(zombie);
+
+}
+
+#pragma endregion input
+
+void USurvBrain::EvaluateGoal()
+{
+	EGoalType newGoal = GetGoal();
+	if (newGoal != goal)
 	{
-	case EGoalType::Search:
-		break;
-	case EGoalType::Loot:
-		CompleteLoot();
-		break;
-	case EGoalType::Hide:
-		break;
+		goal = newGoal;
+		executeGoal = true;
 	}
 }
 
-void USurvBrain::CompleteLoot()
+EGoalType USurvBrain::GetGoal()
 {
-	visitedHouses.Add(toVisitHouses[0]);
-	toVisitHouses.RemoveSingle(toVisitHouses[0]);
+	bool hasWeapon{ SelectWeapon() };
+	if (IsThreathed())
+	{
+		if (hasWeapon)
+		{
+			return EGoalType::Attack;
+		}
+		if (KnowsWeapon()) return EGoalType::Loot;
+
+		return EGoalType::Flee;
+	}
+	if(toVisitHouses.Num() > 0) return EGoalType::Loot;
+
+	if (invenorySlot < maxInventory && knownItems.Num() > 0) return EGoalType::Loot;
+
+	return EGoalType::Search;
 }
 
-
-void USurvBrain::ExecuteState()
+void USurvBrain::ExecuteGoal()
 {
-	executeState = false;
+	executeGoal = false;
 
 	EGoalType newGoal;
 	switch (goal)
@@ -221,60 +211,193 @@ void USurvBrain::ExecuteState()
 	case EGoalType::Loot:
 		newGoal = Loot();
 		break;
-	case EGoalType::Hide:
-		newGoal = Hide();
+	case EGoalType::Attack:
+		newGoal = Attack();
+		break;
+	case EGoalType::Flee:
+		newGoal = Flee();
 		break;
 	}
 
 	if (newGoal != goal)
 	{
 		goal = newGoal;
-		executeState = true;
+		executeGoal = true;
 	}
 }
+
+#pragma region JobsDone
+void USurvBrain::JobsDone(bool completedGoal)
+{
+	if (IsGoalDone())
+	{
+		EvaluateGoal();
+		executeGoal = true;
+	}	
+}
+
+bool USurvBrain::IsGoalDone()
+{
+	switch (goal)
+	{
+	case EGoalType::Search:
+		return CompleteSearch();
+		break;
+	case EGoalType::Loot:
+		return CompleteLoot();
+		break;
+	case EGoalType::Attack:
+		return CompleteAttack();
+		break;
+	case EGoalType::Flee:
+		return CompleteFlee();
+		break;
+	default:
+		break;
+	}
+	return false;
+}
+
+#pragma endregion JobsDone
+
+
+#pragma region search
 
 EGoalType USurvBrain::Search()
 {
-	if (toVisitHouses.Num() > 0) 
-		return EGoalType::Loot;
-
-	blackboard->SetValueAsEnum("goal", (uint8)goal);
-
+	FVector direction{ 0,0,0 };
+	if (fleeDirection == direction)
+	{
+		direction = FMath::VRand();
+	}
+	else
+	{
+		direction = fleeDirection + FMath::VRand();
+	}
+	blackboard->SetValueAsVector("direction", direction);
+	PassGoal();
 	return EGoalType::Search;
 }
 
+bool USurvBrain::CompleteSearch()
+{
+	// if nothing triggered search to end, we continue searching;
+	return true;
+}
+
+#pragma endregion search
+
+#pragma region Loot
 EGoalType USurvBrain::Loot()
 {
-	if (toVisitHouses.Num() == 0)
-		return EGoalType::Search;
+	FVector goalpos{};
+	if (isThreathened && knownWeapon != NULL)
+	{
+		goalpos = knownWeapon->GetActorTransform().GetLocation();
+		GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
+			FString::Printf(TEXT("looking for weapon")));
+	}
+	else
+	{
+		if (toVisitHouses.Num() == 0)
+		{
+			if(knownItems.Num() == 0) return EGoalType::Search;
 
-	blackboard->SetValueAsVector("housePos", toVisitHouses[0]->GetActorTransform().GetLocation());
-	blackboard->SetValueAsEnum("goal", (uint8)goal);
-
+			goalpos = knownItems[0]->GetActorTransform().GetLocation();
+			GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
+				FString::Printf(TEXT("looking for item")));
+		}
+		else
+		{
+			goalpos = toVisitHouses[0]->GetActorTransform().GetLocation();
+			GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
+				FString::Printf(TEXT("looking for house")));
+		}
+	}
+	
+	blackboard->SetValueAsVector("goalPos", goalpos);
+	PassGoal();
 	return EGoalType::Loot;
 }
 
-EGoalType USurvBrain::Hide()
+bool USurvBrain::CompleteLoot()
+{
+	visitedHouses.Add(toVisitHouses[0]);
+	toVisitHouses.RemoveSingle(toVisitHouses[0]);
+	return true;
+}
+
+#pragma endregion Loot
+
+#pragma region Attack
+EGoalType USurvBrain::Attack()
 {
 	if (knownZombies.Num() == 0) return EGoalType::Loot;
+	if (!SelectWeapon()) return EGoalType::Flee;
 
-	blackboard->SetValueAsObject("zombie", knownZombies[0]);
+	blackboard->SetValueAsObject("zombie", closestZombie);
+	PassGoal();
 
-	if (SelectWeapon())
+	return EGoalType::Attack;
+}
+
+bool USurvBrain::CompleteAttack()
+{
+	if (!IsValid(closestZombie))
 	{
-		blackboard->SetValueAsObject("weapon", selectedWeapon);
+		// if the zombie is dead, always evaluate and update;
+		knownZombies.RemoveSingle(closestZombie);
+		return true;
 	}
-	blackboard->SetValueAsEnum("goal", (uint8)goal);
-	return EGoalType::Hide;
+	// if zombie isnt dead, dont change directive;
+	return false;
+}
+#pragma endregion Attack
+
+#pragma region Flee
+EGoalType USurvBrain::Flee()
+{
+	if (!IsThreathed()) return EGoalType::Loot;
+	blackboard->SetValueAsVector("direction", fleeDirection);
+	PassGoal();
+	return EGoalType::Flee;
+}
+
+bool USurvBrain::CompleteFlee()
+{
+	//always evaluate goal and update blackboard
+	return true;
+}
+
+#pragma endregion Flee
+
+
+
+#pragma region acions
+
+void USurvBrain::PickupItem(ABaseItem* itme)
+{
+	GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
+		FString::Printf(TEXT("Can Enemy Shoot? %i"), maxInventory));
+	if (invenorySlot >= maxInventory)
+	{
+		knownItems.Add(itme);
+		return;
+	}
+	knownItems.RemoveSingle(itme);
+	inventory->GrabItem(invenorySlot, itme);
+	invenorySlot++;
 }
 
 bool USurvBrain::SelectWeapon()
 {
-	selectedWeapon = NULL;
+	selectedWeaponIdx = -1;
 	int potentialDamage{};
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
-	for (ABaseItem* InvItem : Items)
+	int toRemove{-1};
+	for (int i{}; i < Items.Num() ; i++)
 	{
+		ABaseItem* InvItem = Items[i];
 		if (IsValid(InvItem))
 		{
 			if (auto weapon = Cast<AWeapon>(InvItem))
@@ -282,60 +405,111 @@ bool USurvBrain::SelectWeapon()
 				int totaldamage{ weapon->GetValue() + weapon->GetDamage() };
 				if (totaldamage > potentialDamage)
 				{
-					selectedWeapon = weapon;
+					selectedWeaponIdx = i;
 					potentialDamage = totaldamage;
 				}
 			}
 		}
 	}
-	if (selectedWeapon == NULL) return false;
-	else return true;
+	if (toRemove >= 0) inventory->RemoveItem(toRemove);
+	if (selectedWeaponIdx == -1)
+	{
+		blackboard->SetValueAsBool("weapon", false);
+		return false;
+	}
+	else
+	{
+		blackboard->SetValueAsBool("weapon", true);
+		return true;
+	}
 }
 
 void USurvBrain::Shoot()
 {
-	selectedWeapon->UseItem(*Survivor);
-	if (selectedWeapon->GetValue() == 0) SelectWeapon();
+	SelectWeapon();
+	if (selectedWeaponIdx < 0) return;
+	inventory->UseItem(selectedWeaponIdx);
+	const TArray<ABaseItem*>& Items = inventory->GetInventory();
+
+	if (Items[selectedWeaponIdx]->GetValue() == 0)
+	{
+		inventory->RemoveItem(selectedWeaponIdx);
+		selectedWeaponIdx = -1;
+		SelectWeapon();
+	}
 }
 
+bool USurvBrain::IsThreathed()
+{
+	if (knownZombies.Num() == 0) return false;
+	bool threathened{false};
+	FVector direction{};
+	float closestZomDistance{ toloratedDistance };
+	for (auto zombie : knownZombies)
+	{
+		auto zombiDirection{ parent->GetActorLocation() - zombie->GetActorLocation()  };
+		auto distance{ zombiDirection.Size() };
 
-//
-//
-//USurvBrain::SurvivorState USurvBrain::Loot::ExecuteState()
-//{
-//	return USurvBrain::Loot();
-//}
-//
-//void USurvBrain::Loot::OnEnter()
-//{
-//}
-//
-//void USurvBrain::Loot::OnExit()
-//{
-//}
-//
-//USurvBrain::SurvivorState USurvBrain::Search::ExecuteState()
-//{
-//	return USurvBrain::Search();
-//}
-//
-//void USurvBrain::Search::OnEnter()
-//{
-//}
-//
-//void USurvBrain::Search::OnExit()
-//{
-//}
-//
-//USurvBrain::SurvivorState USurvBrain::Hide::ExecuteState()
-//{
-//	return USurvBrain::Hide();
-//}
-//
-//void USurvBrain::Hide::OnEnter()
-//{
-//}
-//
-//void USurvBrain::Hide::OnExit()
-//{
-//}
+		// if zombie closer than tolerated
+		if (toloratedDistance > distance)
+		{
+			threathened = true;
+			if (closestZomDistance > distance)
+			{
+				// safe cosest zombie
+				closestZomDistance = distance;
+				closestZombie = zombie;
+			}
+		}
+		// calculate best flee direction;
+		zombiDirection.Normalize();
+		direction += zombiDirection;
+	}
+
+	fleeDirection = direction;
+	isThreathened = threathened;
+	return threathened;
+}
+
+bool USurvBrain::KnowsWeapon()
+{
+	for (auto item : knownItems)
+	{
+		if (item->GetItemType() == EItemType::Pistol || item->GetItemType() == EItemType::Shotgun)
+		{
+			knownWeapon = item;
+			return true;
+		}
+	}
+	return false;
+}
+
+void USurvBrain::ClearHouses()
+{
+	for (auto house : visitedHouses)
+	{
+		toVisitHouses.Add(house);
+	}
+	visitedHouses.Empty();
+}
+
+void USurvBrain::TryHeal()
+{
+	const TArray<ABaseItem*>& Items = inventory->GetInventory();
+	for (int i{}; i < Items.Num(); i++)
+	{
+		ABaseItem* InvItem = Items[i];
+		if (IsValid(InvItem))
+		{
+			if (InvItem->GetItemType() == EItemType::Medkit)
+			{
+				inventory->UseItem(i);
+				return;
+			}
+		}
+	}
+	health->HealDamage(1);
+}
+
+#pragma endregion acions
+
