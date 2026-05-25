@@ -16,6 +16,7 @@
 class UHealthComponent;
 class UStaminaComponent;
 class UInventoryComponent;
+class UFloatingPawnMovement;
 class ABaseItem;
 class AWeapon;
 class AHouse;
@@ -34,6 +35,13 @@ enum class EGoalType : uint8
 	Flee UMETA(DisplayName = "Flee"),
 };
 
+enum class ELootType : uint8
+{
+	House,
+	Item,
+	Weapon
+};
+
 UCLASS(Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 {
@@ -48,9 +56,8 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 	// INVENTORY
 	void PickupItem(ABaseItem* itme);
 	bool SelectWeapon();
-
-	int maxInventory;
-	int invenorySlot{0};
+	int HasSpace();
+	bool HasWeapon();
 
 	//GOALS
 	EGoalType goal;
@@ -78,8 +85,15 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 	int selectedWeaponIdx{ -1 };
 	bool IsThreathed();
 	bool isThreathened{false};
+	FVector fleeDirection;
+	ABaseZombie* closestZombie{ NULL };
+	float toloratedDistance{ 500 };
+
 	bool KnowsWeapon();
 	ABaseItem* knownWeapon{ NULL };
+
+	ELootType lootObjectType;
+	AActor* lootObject;
 
 	//DATA
 	void TryHeal();
@@ -88,9 +102,7 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 	TArray<AHouse*> visitedHouses;
 	TArray<ABaseZombie*> knownZombies;
 	TArray<ABaseItem*> knownItems;
-	FVector fleeDirection;
-	ABaseZombie* closestZombie{NULL};
-	float toloratedDistance{ 10000 };
+	
 	float houseTimer{};
 	float const houseTurnover{20.0f};
 
@@ -112,6 +124,10 @@ protected:
 	UStaminaComponent* stamina;
 
 	UBlackboardComponent* blackboard;
+
+	UFloatingPawnMovement* floatingMovement{NULL};
+	float normalMovement{};
+	float fleeMovement{};
 
 public:	
 	// Called every frame

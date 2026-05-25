@@ -14,6 +14,8 @@
 #include <SurvivorSate.h>
 #include "Survivor/SurvivorPawn.h"
 
+#include "GameFramework/FloatingPawnMovement.h"
+
 #include <AIController.h>
 
 
@@ -37,7 +39,6 @@ void USurvBrain::BeginPlay()
 
 	parent = GetOwner();
 	inventory = parent->GetComponentByClass<UInventoryComponent>();
-	maxInventory = inventory->GetInventoryCapacity();
 	health = parent->GetComponentByClass<UHealthComponent>();
 	stamina = parent->GetComponentByClass<UStaminaComponent>();
 
@@ -46,6 +47,13 @@ void USurvBrain::BeginPlay()
 		if (ASurvivorPawn* surv = Cast<ASurvivorPawn>(parent))
 		{
 			Survivor = surv;
+			auto movement{ surv->GetMovementComponent() };
+			if (auto flyingMovement = Cast<UFloatingPawnMovement>(movement))
+			{
+				floatingMovement = flyingMovement;
+				normalMovement = floatingMovement->GetMaxSpeed();
+				fleeMovement = normalMovement * 2;
+			}
 		}
 		if (AAIController* controller = Cast<AAIController>(Pawn->GetController()))
 		{
@@ -62,6 +70,8 @@ void USurvBrain::BeginPlay()
 			);
 			return;
 		}
+
+
 	}
 	goal = EGoalType::Search;
 	executeGoal = true;
@@ -77,7 +87,7 @@ void USurvBrain::TickComponent(float DeltaTime, ELevelTick TickType, FActorCompo
 
 	if (health->GetHealth() < health->GetMaxHealth() / 2)
 	{
-
+		TryHeal();
 	}
 
 	houseTimer += DeltaTime;
@@ -175,7 +185,20 @@ void USurvBrain::EvaluateGoal()
 	{
 		goal = newGoal;
 		executeGoal = true;
+		if (floatingMovement != NULL)
+		{
+			if (newGoal == EGoalType::Flee)
+			{
+				floatingMovement->MaxSpeed = fleeMovement;
+			}
+			else
+			{
+				floatingMovement->MaxSpeed = normalMovement;
+			}
+		}
 	}
+
+	
 }
 
 EGoalType USurvBrain::GetGoal()
@@ -193,7 +216,7 @@ EGoalType USurvBrain::GetGoal()
 	}
 	if(toVisitHouses.Num() > 0) return EGoalType::Loot;
 
-	if (invenorySlot < maxInventory && knownItems.Num() > 0) return EGoalType::Loot;
+	if (HasSpace() > 0 && knownItems.Num() > 0) return EGoalType::Loot;
 
 	return EGoalType::Search;
 }
@@ -272,6 +295,7 @@ EGoalType USurvBrain::Search()
 	}
 	else
 	{
+		fleeDirection.Normalize();
 		direction = fleeDirection + FMath::VRand();
 	}
 	blackboard->SetValueAsVector("direction", direction);
@@ -290,10 +314,10 @@ bool USurvBrain::CompleteSearch()
 #pragma region Loot
 EGoalType USurvBrain::Loot()
 {
-	FVector goalpos{};
 	if (isThreathened && knownWeapon != NULL)
 	{
-		goalpos = knownWeapon->GetActorTransform().GetLocation();
+		lootObject = knownWeapon;
+		lootObjectType = ELootType::Weapon;
 		GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
 			FString::Printf(TEXT("looking for weapon")));
 	}
@@ -303,18 +327,22 @@ EGoalType USurvBrain::Loot()
 		{
 			if(knownItems.Num() == 0) return EGoalType::Search;
 
-			goalpos = knownItems[0]->GetActorTransform().GetLocation();
+			lootObject = knownItems[0];
+			lootObjectType = ELootType::Item;
 			GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
 				FString::Printf(TEXT("looking for item")));
 		}
 		else
 		{
-			goalpos = toVisitHouses[0]->GetActorTransform().GetLocation();
+			lootObject = toVisitHouses[0];
+			lootObjectType = ELootType::House;
 			GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
 				FString::Printf(TEXT("looking for house")));
 		}
 	}
-	
+
+	blackboard->SetValueAsVector("direction", fleeDirection);
+	FVector goalpos = lootObject->GetActorTransform().GetLocation();
 	blackboard->SetValueAsVector("goalPos", goalpos);
 	PassGoal();
 	return EGoalType::Loot;
@@ -322,8 +350,33 @@ EGoalType USurvBrain::Loot()
 
 bool USurvBrain::CompleteLoot()
 {
-	visitedHouses.Add(toVisitHouses[0]);
-	toVisitHouses.RemoveSingle(toVisitHouses[0]);
+	if (!IsValid(lootObject)) return true;
+
+	switch (lootObjectType)
+	{
+	case ELootType::House:
+	{
+		auto house = Cast<AHouse>(lootObject);
+		visitedHouses.Add(house);
+		toVisitHouses.RemoveSingle(house);
+		break;
+	}
+	case ELootType::Item:
+		// if the item got picked up, pickup ite will take care of this.
+		
+		//auto item = Cast<ABaseItem>(lootObject);
+		//knownItems.RemoveSingle(item);
+		break;
+	case ELootType::Weapon:
+		// if the item got picked up, pickup ite will take care of this.
+		
+		//auto item = Cast<ABaseItem>(lootObject);
+		//knownItems.RemoveSingle(item);
+		break;
+	default:
+		break;
+	}
+	
 	return true;
 }
 
@@ -334,6 +387,13 @@ EGoalType USurvBrain::Attack()
 {
 	if (knownZombies.Num() == 0) return EGoalType::Loot;
 	if (!SelectWeapon()) return EGoalType::Flee;
+
+	if (!IsValid(closestZombie))
+	{
+		// if the zombie is dead, always evaluate and update;
+		knownZombies.RemoveSingle(closestZombie);
+		IsThreathed();
+	}
 
 	blackboard->SetValueAsObject("zombie", closestZombie);
 	PassGoal();
@@ -377,16 +437,25 @@ bool USurvBrain::CompleteFlee()
 
 void USurvBrain::PickupItem(ABaseItem* itme)
 {
-	GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
-		FString::Printf(TEXT("Can Enemy Shoot? %i"), maxInventory));
-	if (invenorySlot >= maxInventory)
+	int space{ HasSpace() };
+	
+	// if i dont have a weapon yet, dont pick up
+	if(HasWeapon() && space >= 0)
 	{
-		knownItems.Add(itme);
+		knownItems.RemoveSingle(itme);
+		inventory->GrabItem(space, itme);
 		return;
 	}
-	knownItems.RemoveSingle(itme);
-	inventory->GrabItem(invenorySlot, itme);
-	invenorySlot++;
+	//if i dont have a weapon && it's a weapon, pick up. previous should ensure there is space.
+	else if (!HasWeapon() && (itme->GetItemType() == EItemType::Shotgun || itme->GetItemType() == EItemType::Pistol))
+	{
+		knownItems.RemoveSingle(itme);
+		inventory->GrabItem(space, itme);
+		return;
+	}
+	// if not picked up, save.
+	if(!knownItems.Contains(itme))
+	knownItems.Add(itme);
 }
 
 bool USurvBrain::SelectWeapon()
@@ -414,14 +483,30 @@ bool USurvBrain::SelectWeapon()
 	if (toRemove >= 0) inventory->RemoveItem(toRemove);
 	if (selectedWeaponIdx == -1)
 	{
-		blackboard->SetValueAsBool("weapon", false);
 		return false;
 	}
 	else
 	{
-		blackboard->SetValueAsBool("weapon", true);
 		return true;
 	}
+}
+
+bool USurvBrain::HasWeapon()
+{
+	const TArray<ABaseItem*>& Items = inventory->GetInventory();
+	int toRemove{ -1 };
+	for (int i{}; i < Items.Num(); i++)
+	{
+		ABaseItem* InvItem = Items[i];
+		if (IsValid(InvItem))
+		{
+			if (InvItem->GetItemType() == EItemType::Shotgun || InvItem->GetItemType() == EItemType::Pistol)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 void USurvBrain::Shoot()
@@ -441,12 +526,17 @@ void USurvBrain::Shoot()
 
 bool USurvBrain::IsThreathed()
 {
+	closestZombie = NULL;
 	if (knownZombies.Num() == 0) return false;
 	bool threathened{false};
 	FVector direction{};
 	float closestZomDistance{ toloratedDistance };
 	for (auto zombie : knownZombies)
 	{
+		if (!IsValid(zombie))
+		{
+			continue;
+		}
 		auto zombiDirection{ parent->GetActorLocation() - zombie->GetActorLocation()  };
 		auto distance{ zombiDirection.Size() };
 
@@ -473,6 +563,7 @@ bool USurvBrain::IsThreathed()
 
 bool USurvBrain::KnowsWeapon()
 {
+	knownWeapon = NULL;
 	for (auto item : knownItems)
 	{
 		if (item->GetItemType() == EItemType::Pistol || item->GetItemType() == EItemType::Shotgun)
@@ -511,5 +602,17 @@ void USurvBrain::TryHeal()
 	health->HealDamage(1);
 }
 
+int USurvBrain::HasSpace()
+{
+	const TArray<ABaseItem*>& Items = inventory->GetInventory();
+	for (int i{}; i < Items.Num(); i++)
+	{
+		if (Items[i] == nullptr)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
 #pragma endregion acions
 
