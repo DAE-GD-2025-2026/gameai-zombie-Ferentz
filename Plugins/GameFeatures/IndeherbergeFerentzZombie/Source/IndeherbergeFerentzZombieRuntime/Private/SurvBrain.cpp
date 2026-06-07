@@ -85,15 +85,22 @@ void USurvBrain::TickComponent(float DeltaTime, ELevelTick TickType, FActorCompo
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (health->GetHealth() < health->GetMaxHealth() / 2)
+	if (health->GetHealth() < health->GetMaxHealth())
 	{
 		TryHeal();
+	}
+
+	if (stamina->GetCurrentStamina() < stamina->GetMaxStamina())
+	{
+		TryEat();
 	}
 
 	houseTimer += DeltaTime;
 	if (houseTimer >= houseTurnover * (visitedHouses.Num() + 1))
 	{
+		if(toVisitHouses.Num() <= 0)
 		ClearHouses();
+		houseTimer = 0;
 	}
 
 	//health->HealDamage(10);
@@ -164,7 +171,11 @@ void USurvBrain::SpotItem(ABaseItem* item)
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
 	if (Items.Contains(item)) return;
 
-	if (item->GetItemType() == EItemType::Garbage) return;
+	if (item->GetItemType() == EItemType::Garbage)
+	{
+		TrashTrash(item);
+		return;
+	}
 	if (item->GetValue() == 0) return;
 
 	if(PickupItem(item))
@@ -407,7 +418,10 @@ EGoalType USurvBrain::Attack()
 	{
 		// if the zombie is dead, always evaluate and update;
 		knownZombies.RemoveSingle(closestZombie);
-		IsThreathed();
+		if (!IsThreathed())
+		{
+			return EGoalType::Loot;
+		}
 	}
 
 	blackboard->SetValueAsObject("zombie", closestZombie);
@@ -454,7 +468,16 @@ bool USurvBrain::CompleteFlee()
 
 #pragma region acions
 
-
+void USurvBrain::TrashTrash(ABaseItem* itme)
+{
+	int space{ HasSpace() };
+	if (space >= 0)
+	{
+		knownItems.RemoveSingle(itme);
+		inventory->GrabItem(space, itme);
+		inventory->RemoveItem(space);
+	}
+}
 
 bool USurvBrain::PickupItem(ABaseItem* itme)
 {
@@ -550,6 +573,28 @@ bool USurvBrain::IsThreathed()
 {
 	closestZombie = NULL;
 	if (knownZombies.Num() == 0) return false;
+
+	knownZombies.RemoveAll([](const AActor* Actor)
+		{
+			// Invalid / destroyed / GC'd
+			if (!IsValid(Actor))
+			{
+				return true;
+			}
+
+			// Illegal name check
+			const FString Name = Actor->GetName();
+
+			if (Name.Contains(TEXT("Illegal")) ||
+				Name.IsEmpty())
+			{
+				return true;
+			}
+
+			return false;
+		});
+
+
 	bool threathened{false};
 	FVector direction{};
 	float closestZomDistance{ toloratedDistance };
@@ -606,22 +651,42 @@ void USurvBrain::ClearHouses()
 	visitedHouses.Empty();
 }
 
-void USurvBrain::TryHeal()
+void USurvBrain::TryEat()
 {
+	int missingStamina = stamina->GetCurrentStamina() - stamina->GetMaxStamina();
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
 	for (int i{}; i < Items.Num(); i++)
 	{
 		ABaseItem* InvItem = Items[i];
 		if (IsValid(InvItem))
 		{
-			if (InvItem->GetItemType() == EItemType::Medkit)
+			if (InvItem->GetItemType() == EItemType::Food && InvItem->GetValue() <= missingStamina)
 			{
 				inventory->UseItem(i);
 				return;
 			}
 		}
 	}
-	health->HealDamage(1);
+	stamina->AddStamina(10);
+}
+
+void USurvBrain::TryHeal()
+{
+	int missingHealth = health->GetMaxHealth() - health->GetHealth();
+	const TArray<ABaseItem*>& Items = inventory->GetInventory();
+	for (int i{}; i < Items.Num(); i++)
+	{
+		ABaseItem* InvItem = Items[i];
+		if (IsValid(InvItem))
+		{
+			if (InvItem->GetItemType() == EItemType::Medkit && InvItem->GetValue() <= missingHealth)
+			{
+				inventory->UseItem(i);
+				return;
+			}
+		}
+	}
+	health->HealDamage(10);
 }
 
 int USurvBrain::HasSpace()
