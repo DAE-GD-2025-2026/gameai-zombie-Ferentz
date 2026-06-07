@@ -101,6 +101,18 @@ void USurvBrain::TickComponent(float DeltaTime, ELevelTick TickType, FActorCompo
 	{
 		ExecuteGoal();
 	}
+
+	if (goal == EGoalType::Loot)
+	{
+		threatcounter += DeltaTime;
+		if (threatcounter >= threatUpdate)
+		{
+			threatcounter = 0.f;
+			IsThreathed();
+			blackboard->SetValueAsVector("direction", fleeDirection);
+		}
+		
+	}
 	// ...
 }
 
@@ -114,7 +126,8 @@ void USurvBrain::GetHurt(AActor* Actor, FAIStimulus Stimulus)
 
 	if (auto zombie = Cast<ABaseZombie>(Actor))
 	{
-		knownZombies.Add(zombie);
+		if(!knownZombies.Contains(zombie))
+			knownZombies.Add(zombie);
 	}
 
 	EvaluateGoal();
@@ -140,7 +153,7 @@ void USurvBrain::SpotThing(AActor* Actor, FAIStimulus Stimulus)
 		SpotZombie(zombi);
 	}
 
-	EvaluateGoal();
+	
 }
 
 void USurvBrain::SpotItem(ABaseItem* item)
@@ -154,15 +167,16 @@ void USurvBrain::SpotItem(ABaseItem* item)
 	if (item->GetItemType() == EItemType::Garbage) return;
 	if (item->GetValue() == 0) return;
 
-	PickupItem(item);
+	if(PickupItem(item))
+		EvaluateGoal();
 }
 
 void USurvBrain::SpotHouse(AHouse* house)
 {
 	if (toVisitHouses.Contains(house) || visitedHouses.Contains(house)) return;
 
-	toVisitHouses.Add(house);
-
+	toVisitHouses.AddHead(house);// Add(house);
+	EvaluateGoal();
 	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
 		FString::Printf(TEXT("Saw house!")));
 
@@ -172,8 +186,9 @@ void USurvBrain::SpotZombie(ABaseZombie* zombie)
 {
 	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
 		FString::Printf(TEXT("Saw zombi!")));
+	if (!knownZombies.Contains(zombie))
 	knownZombies.Add(zombie);
-
+	EvaluateGoal();
 }
 
 #pragma endregion input
@@ -334,7 +349,7 @@ EGoalType USurvBrain::Loot()
 		}
 		else
 		{
-			lootObject = toVisitHouses[0];
+			lootObject = toVisitHouses.GetHead()->GetValue();
 			lootObjectType = ELootType::House;
 			GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
 				FString::Printf(TEXT("looking for house")));
@@ -357,8 +372,8 @@ bool USurvBrain::CompleteLoot()
 	case ELootType::House:
 	{
 		auto house = Cast<AHouse>(lootObject);
-		visitedHouses.Add(house);
-		toVisitHouses.RemoveSingle(house);
+		visitedHouses.AddTail(house);
+		toVisitHouses.RemoveNode(house);
 		break;
 	}
 	case ELootType::Item:
@@ -409,6 +424,10 @@ bool USurvBrain::CompleteAttack()
 		knownZombies.RemoveSingle(closestZombie);
 		return true;
 	}
+	if (!HasWeapon())
+	{
+		return true;
+	}
 	// if zombie isnt dead, dont change directive;
 	return false;
 }
@@ -435,7 +454,9 @@ bool USurvBrain::CompleteFlee()
 
 #pragma region acions
 
-void USurvBrain::PickupItem(ABaseItem* itme)
+
+
+bool USurvBrain::PickupItem(ABaseItem* itme)
 {
 	int space{ HasSpace() };
 	
@@ -444,18 +465,19 @@ void USurvBrain::PickupItem(ABaseItem* itme)
 	{
 		knownItems.RemoveSingle(itme);
 		inventory->GrabItem(space, itme);
-		return;
+		return true;
 	}
 	//if i dont have a weapon && it's a weapon, pick up. previous should ensure there is space.
 	else if (!HasWeapon() && (itme->GetItemType() == EItemType::Shotgun || itme->GetItemType() == EItemType::Pistol))
 	{
 		knownItems.RemoveSingle(itme);
 		inventory->GrabItem(space, itme);
-		return;
+		return true;
 	}
 	// if not picked up, save.
 	if(!knownItems.Contains(itme))
 	knownItems.Add(itme);
+	return false;
 }
 
 bool USurvBrain::SelectWeapon()
@@ -579,7 +601,7 @@ void USurvBrain::ClearHouses()
 {
 	for (auto house : visitedHouses)
 	{
-		toVisitHouses.Add(house);
+		toVisitHouses.AddTail(house);
 	}
 	visitedHouses.Empty();
 }
@@ -604,6 +626,11 @@ void USurvBrain::TryHeal()
 
 int USurvBrain::HasSpace()
 {
+	bool InventoryClean{ false };
+	while (!InventoryClean)
+	{
+		InventoryClean = ClearUpInventory();
+	}
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
 	for (int i{}; i < Items.Num(); i++)
 	{
@@ -614,5 +641,24 @@ int USurvBrain::HasSpace()
 	}
 	return -1;
 }
+
+bool USurvBrain::ClearUpInventory()
+{
+	const TArray<ABaseItem*>& Items = inventory->GetInventory();
+	for (int i{}; i < Items.Num(); i++)
+	{
+		ABaseItem* InvItem = Items[i];
+		if (IsValid(InvItem))
+		{
+			if (InvItem->GetValue() == 0)
+			{
+				inventory->RemoveItem(i);
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 #pragma endregion acions
 

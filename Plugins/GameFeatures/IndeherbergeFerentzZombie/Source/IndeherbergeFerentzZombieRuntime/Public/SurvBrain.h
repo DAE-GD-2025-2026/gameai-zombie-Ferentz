@@ -54,10 +54,11 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 
 
 	// INVENTORY
-	void PickupItem(ABaseItem* itme);
+	bool PickupItem(ABaseItem* itme);
 	bool SelectWeapon();
 	int HasSpace();
 	bool HasWeapon();
+	bool ClearUpInventory();
 
 	//GOALS
 	EGoalType goal;
@@ -95,11 +96,14 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 	ELootType lootObjectType;
 	AActor* lootObject;
 
+	float threatcounter{0.f};
+	float threatUpdate{1.f};
+
 	//DATA
 	void TryHeal();
 	void ClearHouses();
-	TArray<AHouse*> toVisitHouses;
-	TArray<AHouse*> visitedHouses;
+	TDoubleLinkedList<AHouse*> toVisitHouses;
+	TDoubleLinkedList<AHouse*> visitedHouses;
 	TArray<ABaseZombie*> knownZombies;
 	TArray<ABaseItem*> knownItems;
 	
