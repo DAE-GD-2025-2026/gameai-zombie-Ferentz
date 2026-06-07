@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "SurvBrain.h"
+#include "SurvBrain_IndeherbergeFerentz.h"
 
 #include "Common/InventoryComponent.h"
 #include "Common/HealthComponent.h"
@@ -11,7 +11,7 @@
 #include "Items/Weapon.h"
 #include "Village/House/House.h"
 #include "Zombies/BaseZombie.h"
-#include <SurvivorSate.h>
+#include <SurvivorSate_IndeherbergeFerentz.h>
 #include "Survivor/SurvivorPawn.h"
 
 #include "GameFramework/FloatingPawnMovement.h"
@@ -20,7 +20,7 @@
 
 
 // Sets default values for this component's properties
-USurvBrain::USurvBrain()
+USurvBrain_IndeherbergeFerentz::USurvBrain_IndeherbergeFerentz()
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
@@ -31,7 +31,7 @@ USurvBrain::USurvBrain()
 
 
 // Called when the game starts
-void USurvBrain::BeginPlay()
+void USurvBrain_IndeherbergeFerentz::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -73,7 +73,7 @@ void USurvBrain::BeginPlay()
 
 
 	}
-	goal = EGoalType::Search;
+	goal = EGoalType_IndeherbergeFerentz::Search;
 	executeGoal = true;
 
 	blackboard->SetValueAsObject("brain", this);
@@ -81,7 +81,7 @@ void USurvBrain::BeginPlay()
 }
 
 // Called every frame
-void USurvBrain::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void USurvBrain_IndeherbergeFerentz::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
@@ -109,7 +109,7 @@ void USurvBrain::TickComponent(float DeltaTime, ELevelTick TickType, FActorCompo
 		ExecuteGoal();
 	}
 
-	if (goal == EGoalType::Loot)
+	if (goal == EGoalType_IndeherbergeFerentz::Loot)
 	{
 		threatcounter += DeltaTime;
 		if (threatcounter >= threatUpdate)
@@ -125,7 +125,7 @@ void USurvBrain::TickComponent(float DeltaTime, ELevelTick TickType, FActorCompo
 
 
 #pragma region input
-void USurvBrain::GetHurt(AActor* Actor, FAIStimulus Stimulus)
+void USurvBrain_IndeherbergeFerentz::GetHurt(AActor* Actor, FAIStimulus Stimulus)
 {
 
 	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
@@ -140,7 +140,7 @@ void USurvBrain::GetHurt(AActor* Actor, FAIStimulus Stimulus)
 	EvaluateGoal();
 }
 
-void USurvBrain::SpotThing(AActor* Actor, FAIStimulus Stimulus)
+void USurvBrain_IndeherbergeFerentz::SpotThing(AActor* Actor, FAIStimulus Stimulus)
 {
 	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
 		FString::Printf(TEXT("Saw Something!")));
@@ -163,7 +163,7 @@ void USurvBrain::SpotThing(AActor* Actor, FAIStimulus Stimulus)
 	
 }
 
-void USurvBrain::SpotItem(ABaseItem* item)
+void USurvBrain_IndeherbergeFerentz::SpotItem(ABaseItem* item)
 {
 	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
 		FString::Printf(TEXT("Saw item!")));
@@ -182,7 +182,7 @@ void USurvBrain::SpotItem(ABaseItem* item)
 		EvaluateGoal();
 }
 
-void USurvBrain::SpotHouse(AHouse* house)
+void USurvBrain_IndeherbergeFerentz::SpotHouse(AHouse* house)
 {
 	if (toVisitHouses.Contains(house) || visitedHouses.Contains(house)) return;
 
@@ -193,7 +193,7 @@ void USurvBrain::SpotHouse(AHouse* house)
 
 }
 
-void USurvBrain::SpotZombie(ABaseZombie* zombie)
+void USurvBrain_IndeherbergeFerentz::SpotZombie(ABaseZombie* zombie)
 {
 	GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green,
 		FString::Printf(TEXT("Saw zombi!")));
@@ -204,16 +204,16 @@ void USurvBrain::SpotZombie(ABaseZombie* zombie)
 
 #pragma endregion input
 
-void USurvBrain::EvaluateGoal()
+void USurvBrain_IndeherbergeFerentz::EvaluateGoal()
 {
-	EGoalType newGoal = GetGoal();
+	EGoalType_IndeherbergeFerentz newGoal = GetGoal();
 	if (newGoal != goal)
 	{
 		goal = newGoal;
 		executeGoal = true;
 		if (floatingMovement != NULL)
 		{
-			if (newGoal == EGoalType::Flee)
+			if (newGoal == EGoalType_IndeherbergeFerentz::Flee)
 			{
 				floatingMovement->MaxSpeed = fleeMovement;
 			}
@@ -227,43 +227,43 @@ void USurvBrain::EvaluateGoal()
 	
 }
 
-EGoalType USurvBrain::GetGoal()
+EGoalType_IndeherbergeFerentz USurvBrain_IndeherbergeFerentz::GetGoal()
 {
 	bool hasWeapon{ SelectWeapon() };
 	if (IsThreathed())
 	{
 		if (hasWeapon)
 		{
-			return EGoalType::Attack;
+			return EGoalType_IndeherbergeFerentz::Attack;
 		}
-		if (KnowsWeapon()) return EGoalType::Loot;
+		if (KnowsWeapon()) return EGoalType_IndeherbergeFerentz::Loot;
 
-		return EGoalType::Flee;
+		return EGoalType_IndeherbergeFerentz::Flee;
 	}
-	if(toVisitHouses.Num() > 0) return EGoalType::Loot;
+	if(toVisitHouses.Num() > 0) return EGoalType_IndeherbergeFerentz::Loot;
 
-	if (HasSpace() > 0 && knownItems.Num() > 0) return EGoalType::Loot;
+	if (HasSpace() > 0 && knownItems.Num() > 0) return EGoalType_IndeherbergeFerentz::Loot;
 
-	return EGoalType::Search;
+	return EGoalType_IndeherbergeFerentz::Search;
 }
 
-void USurvBrain::ExecuteGoal()
+void USurvBrain_IndeherbergeFerentz::ExecuteGoal()
 {
 	executeGoal = false;
 
-	EGoalType newGoal;
+	EGoalType_IndeherbergeFerentz newGoal;
 	switch (goal)
 	{
-	case EGoalType::Search:
+	case EGoalType_IndeherbergeFerentz::Search:
 		newGoal = Search();
 		break;
-	case EGoalType::Loot:
+	case EGoalType_IndeherbergeFerentz::Loot:
 		newGoal = Loot();
 		break;
-	case EGoalType::Attack:
+	case EGoalType_IndeherbergeFerentz::Attack:
 		newGoal = Attack();
 		break;
-	case EGoalType::Flee:
+	case EGoalType_IndeherbergeFerentz::Flee:
 		newGoal = Flee();
 		break;
 	}
@@ -276,7 +276,7 @@ void USurvBrain::ExecuteGoal()
 }
 
 #pragma region JobsDone
-void USurvBrain::JobsDone(bool completedGoal)
+void USurvBrain_IndeherbergeFerentz::JobsDone(bool completedGoal)
 {
 	if (IsGoalDone())
 	{
@@ -285,20 +285,20 @@ void USurvBrain::JobsDone(bool completedGoal)
 	}	
 }
 
-bool USurvBrain::IsGoalDone()
+bool USurvBrain_IndeherbergeFerentz::IsGoalDone()
 {
 	switch (goal)
 	{
-	case EGoalType::Search:
+	case EGoalType_IndeherbergeFerentz::Search:
 		return CompleteSearch();
 		break;
-	case EGoalType::Loot:
+	case EGoalType_IndeherbergeFerentz::Loot:
 		return CompleteLoot();
 		break;
-	case EGoalType::Attack:
+	case EGoalType_IndeherbergeFerentz::Attack:
 		return CompleteAttack();
 		break;
-	case EGoalType::Flee:
+	case EGoalType_IndeherbergeFerentz::Flee:
 		return CompleteFlee();
 		break;
 	default:
@@ -312,7 +312,7 @@ bool USurvBrain::IsGoalDone()
 
 #pragma region search
 
-EGoalType USurvBrain::Search()
+EGoalType_IndeherbergeFerentz USurvBrain_IndeherbergeFerentz::Search()
 {
 	FVector direction{ 0,0,0 };
 	if (fleeDirection == direction)
@@ -326,10 +326,10 @@ EGoalType USurvBrain::Search()
 	}
 	blackboard->SetValueAsVector("direction", direction);
 	PassGoal();
-	return EGoalType::Search;
+	return EGoalType_IndeherbergeFerentz::Search;
 }
 
-bool USurvBrain::CompleteSearch()
+bool USurvBrain_IndeherbergeFerentz::CompleteSearch()
 {
 	// if nothing triggered search to end, we continue searching;
 	return true;
@@ -338,12 +338,12 @@ bool USurvBrain::CompleteSearch()
 #pragma endregion search
 
 #pragma region Loot
-EGoalType USurvBrain::Loot()
+EGoalType_IndeherbergeFerentz USurvBrain_IndeherbergeFerentz::Loot()
 {
 	if (isThreathened && knownWeapon != NULL)
 	{
 		lootObject = knownWeapon;
-		lootObjectType = ELootType::Weapon;
+		lootObjectType = ELootType_IndeherbergeFerentz::Weapon;
 		GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
 			FString::Printf(TEXT("looking for weapon")));
 	}
@@ -351,17 +351,17 @@ EGoalType USurvBrain::Loot()
 	{
 		if (toVisitHouses.Num() == 0)
 		{
-			if(knownItems.Num() == 0) return EGoalType::Search;
+			if(knownItems.Num() == 0) return EGoalType_IndeherbergeFerentz::Search;
 
 			lootObject = knownItems[0];
-			lootObjectType = ELootType::Item;
+			lootObjectType = ELootType_IndeherbergeFerentz::Item;
 			GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
 				FString::Printf(TEXT("looking for item")));
 		}
 		else
 		{
 			lootObject = toVisitHouses.GetHead()->GetValue();
-			lootObjectType = ELootType::House;
+			lootObjectType = ELootType_IndeherbergeFerentz::House;
 			GEngine->AddOnScreenDebugMessage(5, 10.f, FColor::Red,
 				FString::Printf(TEXT("looking for house")));
 		}
@@ -371,29 +371,29 @@ EGoalType USurvBrain::Loot()
 	FVector goalpos = lootObject->GetActorTransform().GetLocation();
 	blackboard->SetValueAsVector("goalPos", goalpos);
 	PassGoal();
-	return EGoalType::Loot;
+	return EGoalType_IndeherbergeFerentz::Loot;
 }
 
-bool USurvBrain::CompleteLoot()
+bool USurvBrain_IndeherbergeFerentz::CompleteLoot()
 {
 	if (!IsValid(lootObject)) return true;
 
 	switch (lootObjectType)
 	{
-	case ELootType::House:
+	case ELootType_IndeherbergeFerentz::House:
 	{
 		auto house = Cast<AHouse>(lootObject);
 		visitedHouses.AddTail(house);
 		toVisitHouses.RemoveNode(house);
 		break;
 	}
-	case ELootType::Item:
+	case ELootType_IndeherbergeFerentz::Item:
 		// if the item got picked up, pickup ite will take care of this.
 		
 		//auto item = Cast<ABaseItem>(lootObject);
 		//knownItems.RemoveSingle(item);
 		break;
-	case ELootType::Weapon:
+	case ELootType_IndeherbergeFerentz::Weapon:
 		// if the item got picked up, pickup ite will take care of this.
 		
 		//auto item = Cast<ABaseItem>(lootObject);
@@ -409,10 +409,10 @@ bool USurvBrain::CompleteLoot()
 #pragma endregion Loot
 
 #pragma region Attack
-EGoalType USurvBrain::Attack()
+EGoalType_IndeherbergeFerentz USurvBrain_IndeherbergeFerentz::Attack()
 {
-	if (knownZombies.Num() == 0) return EGoalType::Loot;
-	if (!SelectWeapon()) return EGoalType::Flee;
+	if (knownZombies.Num() == 0) return EGoalType_IndeherbergeFerentz::Loot;
+	if (!SelectWeapon()) return EGoalType_IndeherbergeFerentz::Flee;
 
 	if (!IsValid(closestZombie))
 	{
@@ -420,17 +420,17 @@ EGoalType USurvBrain::Attack()
 		knownZombies.RemoveSingle(closestZombie);
 		if (!IsThreathed())
 		{
-			return EGoalType::Loot;
+			return EGoalType_IndeherbergeFerentz::Loot;
 		}
 	}
 
 	blackboard->SetValueAsObject("zombie", closestZombie);
 	PassGoal();
 
-	return EGoalType::Attack;
+	return EGoalType_IndeherbergeFerentz::Attack;
 }
 
-bool USurvBrain::CompleteAttack()
+bool USurvBrain_IndeherbergeFerentz::CompleteAttack()
 {
 	if (!IsValid(closestZombie))
 	{
@@ -448,15 +448,15 @@ bool USurvBrain::CompleteAttack()
 #pragma endregion Attack
 
 #pragma region Flee
-EGoalType USurvBrain::Flee()
+EGoalType_IndeherbergeFerentz USurvBrain_IndeherbergeFerentz::Flee()
 {
-	if (!IsThreathed()) return EGoalType::Loot;
+	if (!IsThreathed()) return EGoalType_IndeherbergeFerentz::Loot;
 	blackboard->SetValueAsVector("direction", fleeDirection);
 	PassGoal();
-	return EGoalType::Flee;
+	return EGoalType_IndeherbergeFerentz::Flee;
 }
 
-bool USurvBrain::CompleteFlee()
+bool USurvBrain_IndeherbergeFerentz::CompleteFlee()
 {
 	//always evaluate goal and update blackboard
 	return true;
@@ -468,7 +468,7 @@ bool USurvBrain::CompleteFlee()
 
 #pragma region acions
 
-void USurvBrain::TrashTrash(ABaseItem* itme)
+void USurvBrain_IndeherbergeFerentz::TrashTrash(ABaseItem* itme)
 {
 	int space{ HasSpace() };
 	if (space >= 0)
@@ -479,7 +479,7 @@ void USurvBrain::TrashTrash(ABaseItem* itme)
 	}
 }
 
-bool USurvBrain::PickupItem(ABaseItem* itme)
+bool USurvBrain_IndeherbergeFerentz::PickupItem(ABaseItem* itme)
 {
 	int space{ HasSpace() };
 	
@@ -503,7 +503,7 @@ bool USurvBrain::PickupItem(ABaseItem* itme)
 	return false;
 }
 
-bool USurvBrain::SelectWeapon()
+bool USurvBrain_IndeherbergeFerentz::SelectWeapon()
 {
 	selectedWeaponIdx = -1;
 	int potentialDamage{};
@@ -536,7 +536,7 @@ bool USurvBrain::SelectWeapon()
 	}
 }
 
-bool USurvBrain::HasWeapon()
+bool USurvBrain_IndeherbergeFerentz::HasWeapon()
 {
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
 	int toRemove{ -1 };
@@ -554,7 +554,7 @@ bool USurvBrain::HasWeapon()
 	return false;
 }
 
-void USurvBrain::Shoot()
+void USurvBrain_IndeherbergeFerentz::Shoot()
 {
 	SelectWeapon();
 	if (selectedWeaponIdx < 0) return;
@@ -569,7 +569,7 @@ void USurvBrain::Shoot()
 	}
 }
 
-bool USurvBrain::IsThreathed()
+bool USurvBrain_IndeherbergeFerentz::IsThreathed()
 {
 	closestZombie = NULL;
 	if (knownZombies.Num() == 0) return false;
@@ -628,7 +628,7 @@ bool USurvBrain::IsThreathed()
 	return threathened;
 }
 
-bool USurvBrain::KnowsWeapon()
+bool USurvBrain_IndeherbergeFerentz::KnowsWeapon()
 {
 	knownWeapon = NULL;
 	for (auto item : knownItems)
@@ -642,7 +642,7 @@ bool USurvBrain::KnowsWeapon()
 	return false;
 }
 
-void USurvBrain::ClearHouses()
+void USurvBrain_IndeherbergeFerentz::ClearHouses()
 {
 	for (auto house : visitedHouses)
 	{
@@ -651,7 +651,7 @@ void USurvBrain::ClearHouses()
 	visitedHouses.Empty();
 }
 
-void USurvBrain::TryEat()
+void USurvBrain_IndeherbergeFerentz::TryEat()
 {
 	int missingStamina = stamina->GetCurrentStamina() - stamina->GetMaxStamina();
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
@@ -670,7 +670,7 @@ void USurvBrain::TryEat()
 	stamina->AddStamina(10);
 }
 
-void USurvBrain::TryHeal()
+void USurvBrain_IndeherbergeFerentz::TryHeal()
 {
 	int missingHealth = health->GetMaxHealth() - health->GetHealth();
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
@@ -689,7 +689,7 @@ void USurvBrain::TryHeal()
 	health->HealDamage(10);
 }
 
-int USurvBrain::HasSpace()
+int USurvBrain_IndeherbergeFerentz::HasSpace()
 {
 	bool InventoryClean{ false };
 	while (!InventoryClean)
@@ -707,7 +707,7 @@ int USurvBrain::HasSpace()
 	return -1;
 }
 
-bool USurvBrain::ClearUpInventory()
+bool USurvBrain_IndeherbergeFerentz::ClearUpInventory()
 {
 	const TArray<ABaseItem*>& Items = inventory->GetInventory();
 	for (int i{}; i < Items.Num(); i++)

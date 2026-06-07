@@ -11,7 +11,7 @@
 
 #include "BehaviorTree/BlackboardComponent.h"
 
-#include "SurvBrain.generated.h"
+#include "SurvBrain_IndeherbergeFerentz.generated.h"
 
 class UHealthComponent;
 class UStaminaComponent;
@@ -22,11 +22,11 @@ class AWeapon;
 class AHouse;
 class ABaseZombie;
 //class UBlackboardComponent;
-class USurvivorState;
+class USurvivorState_IndeherbergeFerentz;
 class ASurvivorPawn;
 
 UENUM(BlueprintType)
-enum class EGoalType : uint8
+enum class EGoalType_IndeherbergeFerentz : uint8
 {
 
 	Search UMETA(DisplayName = "Search"),
@@ -35,7 +35,7 @@ enum class EGoalType : uint8
 	Flee UMETA(DisplayName = "Flee"),
 };
 
-enum class ELootType : uint8
+enum class ELootType_IndeherbergeFerentz : uint8
 {
 	House,
 	Item,
@@ -43,7 +43,7 @@ enum class ELootType : uint8
 };
 
 UCLASS(Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
+class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain_IndeherbergeFerentz : public UActorComponent
 {
 	GENERATED_BODY()
 
@@ -64,25 +64,25 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 	void TrashTrash(ABaseItem* itme);
 
 	//GOALS
-	EGoalType goal;
+	EGoalType_IndeherbergeFerentz goal;
 	void PassGoal() { blackboard->SetValueAsEnum("goal", (uint8)goal); }
 	bool IsGoalDone();
 	bool executeGoal;
 	void ExecuteGoal();
 	void EvaluateGoal();
-	EGoalType GetGoal();
+	EGoalType_IndeherbergeFerentz GetGoal();
 
 	//search
-	EGoalType Search();
+	EGoalType_IndeherbergeFerentz Search();
 	bool CompleteSearch();
 	//loot
-	EGoalType Loot();
+	EGoalType_IndeherbergeFerentz Loot();
 	bool CompleteLoot();
 	//attack
-	EGoalType Attack();
+	EGoalType_IndeherbergeFerentz Attack();
 	bool CompleteAttack();
 	//flee
-	EGoalType Flee();
+	EGoalType_IndeherbergeFerentz Flee();
 	bool CompleteFlee();
 
 	//STATE
@@ -96,7 +96,7 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 	bool KnowsWeapon();
 	ABaseItem* knownWeapon{ NULL };
 
-	ELootType lootObjectType;
+	ELootType_IndeherbergeFerentz lootObjectType;
 	AActor* lootObject;
 
 	float threatcounter{0.f};
@@ -116,7 +116,7 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API USurvBrain : public UActorComponent
 
 public:	
 	// Sets default values for this component's properties
-	USurvBrain();
+	USurvBrain_IndeherbergeFerentz();
 	
 
 protected:

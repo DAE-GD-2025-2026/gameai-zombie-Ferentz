@@ -1,24 +1,24 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "StudentPerceptor.h"
+#include "StudentPerceptor_IndeherbergeFerentz.h"
 #include <AIController.h>
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Items/BaseItem.h"
 #include "Zombies/BaseZombie.h"
 #include "Village/House/House.h"
 
-#include "SurvBrain.h"
+#include "SurvBrain_IndeherbergeFerentz.h"
 
 
-UStudentPerceptor::UStudentPerceptor()
+UStudentPerceptor_IndeherbergeFerentz::UStudentPerceptor_IndeherbergeFerentz()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	sightId = UAISense::GetSenseID(UAISense_Sight::StaticClass());
 	hurtId = UAISense::GetSenseID(UAISense_Damage::StaticClass());
 }
 
-void UStudentPerceptor::BeginPlay()
+void UStudentPerceptor_IndeherbergeFerentz::BeginPlay()
 {
 	Super::BeginPlay();
 	
@@ -26,13 +26,13 @@ void UStudentPerceptor::BeginPlay()
 	if (auto PerceptionComp = parent->GetComponentByClass<UAIPerceptionComponent>())
 	{
 		parentPerception = PerceptionComp;
-		PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(this, &UStudentPerceptor::OnPerceptionUpdated);
+		PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(this, &UStudentPerceptor_IndeherbergeFerentz::OnPerceptionUpdated);
 		PerceptionComp->ProcessStimuli();
 	}
 	if (APawn* Pawn = Cast<APawn>(parent))
 	{
 		
-		if (auto brainComp = parent->GetComponentByClass<USurvBrain>())
+		if (auto brainComp = parent->GetComponentByClass<USurvBrain_IndeherbergeFerentz>())
 		{
 			brain = brainComp;
 		}
@@ -43,7 +43,7 @@ void UStudentPerceptor::BeginPlay()
 	
 }
 
-void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+void UStudentPerceptor_IndeherbergeFerentz::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	if (Stimulus.Type == sightId)
 	{

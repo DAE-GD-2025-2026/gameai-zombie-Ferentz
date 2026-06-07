@@ -1,9 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "SurvivorSate.h"
+#include "SurvivorSate_IndeherbergeFerentz.h"
 
-USurvivorState* Loot::ExecuteState()
+USurvivorState_IndeherbergeFerentz* Loot::ExecuteState()
 {
 	return NewObject<Loot>(GetOuter());
 }
@@ -16,7 +16,7 @@ void Loot::OnExit()
 {
 }
 
-USurvivorState* Search::ExecuteState()
+USurvivorState_IndeherbergeFerentz* Search::ExecuteState()
 {
 	return NULL;
 }
@@ -29,7 +29,7 @@ void Search::OnExit()
 {
 }
 
-USurvivorState* Hide::ExecuteState()
+USurvivorState_IndeherbergeFerentz* Hide::ExecuteState()
 {
 	return NULL;
 }

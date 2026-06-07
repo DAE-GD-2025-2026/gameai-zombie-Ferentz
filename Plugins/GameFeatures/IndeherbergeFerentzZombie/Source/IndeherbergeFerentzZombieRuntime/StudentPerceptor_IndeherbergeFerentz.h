@@ -8,17 +8,17 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Damage.h"
 #include "Perception/AISense_Damage.h"
-#include "StudentPerceptor.generated.h"
+#include "StudentPerceptor_IndeherbergeFerentz.generated.h"
 
-class USurvBrain;
+class USurvBrain_IndeherbergeFerentz;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class INDEHERBERGEFERENTZZOMBIERUNTIME_API UStudentPerceptor : public UActorComponent
+class INDEHERBERGEFERENTZZOMBIERUNTIME_API UStudentPerceptor_IndeherbergeFerentz : public UActorComponent
 {
 	GENERATED_BODY()
 
 	AActor* parent;
-	USurvBrain* brain;
+	USurvBrain_IndeherbergeFerentz* brain;
 	UAIPerceptionComponent* parentPerception;
 
 	FAISenseID sightId;
@@ -26,7 +26,7 @@ class INDEHERBERGEFERENTZZOMBIERUNTIME_API UStudentPerceptor : public UActorComp
 
 public:
 	// Sets default values for this component's properties
-	UStudentPerceptor();
+	UStudentPerceptor_IndeherbergeFerentz();
 	
 	virtual void BeginPlay() override;
 
